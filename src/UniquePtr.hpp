@@ -1,9 +1,13 @@
 #pragma once
+#include <concepts>
 
 template <typename T>
 class UniquePtr {
 private:
     T* ptr;
+
+    template <typename U>
+    friend class UniquePtr;
 
 public:
     explicit UniquePtr(T* p = nullptr) noexcept : ptr(p) {}
@@ -25,6 +29,17 @@ public:
             ptr = other.ptr;
             other.ptr = nullptr;
         }
+        return *this;
+    }
+
+    template <typename U>
+        requires std::derived_from<U, T>
+    UniquePtr(UniquePtr<U>&& other) noexcept : ptr(other.release()) {}
+
+    template <typename U>
+        requires std::derived_from<U, T>
+    UniquePtr& operator=(UniquePtr<U>&& other) noexcept {
+        reset(other.release());
         return *this;
     }
 
