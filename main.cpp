@@ -84,9 +84,9 @@ int main() {
         canvas.Append(SharedPtr<Rectangle>(new Rectangle("Canvas rect 1", 5.0, 2.0)));
         canvas.Append(SharedPtr<Circle>(new Circle("Canvas circle 2", 3.0)));
 
-        std::cout << "\nShapes on the canvas: " << canvas.GetLengh() << "\n\n";
+        std::cout << "\nShapes on the canvas: " << canvas.GetLength() << "\n\n";
         std::cout << "Iter over the canvas and draw all the shapes:\n";
-        for (int i = 0; i < canvas.GetLengh(); ++i) {
+        for (int i = 0; i < canvas.GetLength(); ++i) {
             std::cout << "[" << i << "] ";
             canvas[i]->Draw();
         }
@@ -94,8 +94,8 @@ int main() {
         std::cout << "\nRemoving the middle shape (rectangle):\n";
         canvas.RemoveAt(1);
 
-        std::cout << "\nShapes remaining: " << canvas.GetLengh() << "\n\n";
-        for (int i = 0; i < canvas.GetLengh(); ++i) {
+        std::cout << "\nShapes remaining: " << canvas.GetLength() << "\n\n";
+        for (int i = 0; i < canvas.GetLength(); ++i) {
             std::cout << "[" << i << "] ";
             canvas[i]->Draw();
         }

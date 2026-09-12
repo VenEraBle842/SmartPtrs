@@ -1,5 +1,6 @@
 #pragma once
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include "UniquePtr.hpp"
 
@@ -8,7 +9,7 @@ class Sequence {
 public:
     virtual ~Sequence() = default;
 
-    virtual int GetLengh() const noexcept = 0;
+    virtual int GetLength() const noexcept = 0;
     virtual bool IsEmpty() const noexcept = 0;
 
     virtual const T& Get(int index) const = 0;
@@ -83,21 +84,32 @@ public:
     ~SmartArraySequence() override = default;
 
     SmartArraySequence(const SmartArraySequence& other)
-        : buffer(other.capacity > 0 ? new T[other.capacity] : nullptr),
-          size(other.size),
-          capacity(other.capacity)
+        : buffer(0), size(0), capacity(0)
     {
-        for (int i = 0; i < size; ++i) {
-            buffer[i] = other.buffer[i];
+        if constexpr (std::is_copy_assignable_v<T>) {
+            if (other.capacity > 0) {
+                buffer = UniquePtr<T[]>(new T[other.capacity]);
+                capacity = other.capacity;
+                size = other.size;
+                for (int i = 0; i < size; ++i) {
+                    buffer[i] = other.buffer[i];
+                }
+            }
+        } else {
+            throw std::runtime_error("Copying is not supported for move-only types");
         }
     }
 
     SmartArraySequence& operator=(const SmartArraySequence& other) {
-        if (this != &other) {
-            SmartArraySequence tmp(other);
-            *this = std::move(tmp);
+        if constexpr (std::is_copy_assignable_v<T>) {
+            if (this != &other) {
+                SmartArraySequence tmp(other);
+                *this = std::move(tmp);
+            }
+            return *this;
+        } else {
+            throw std::runtime_error("Copying is not supported for move-only types");
         }
-        return *this;
     }
 
     SmartArraySequence(SmartArraySequence&& other) noexcept
@@ -122,7 +134,7 @@ public:
     }
 
 
-    int GetLengh() const noexcept override { return size; }
+    int GetLength() const noexcept override { return size; }
     bool IsEmpty() const noexcept override { return size == 0; }
 
     const T& Get(int index) const override {
@@ -145,8 +157,12 @@ public:
     void Prepend(T&& item) override { InsertAt(std::move(item), 0); }
 
     void InsertAt(const T& item, int index) override {
-        PrepareInsert(index);
-        buffer[index] = item;
+        if constexpr (std::is_copy_assignable_v<T>) {
+            PrepareInsert(index);
+            buffer[index] = item;
+        } else {
+            throw std::runtime_error("Copying is not supported for move-only types");
+        }
     }
     void InsertAt(T&& item, int index) override {
         PrepareInsert(index);
