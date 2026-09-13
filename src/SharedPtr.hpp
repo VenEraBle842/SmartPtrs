@@ -1,17 +1,26 @@
 #pragma once
 #include <concepts>
+#include <type_traits>
 
 template <typename T>
 class SharedPtr {
+public:
+    using ElementType = std::remove_extent_t<T>;
+    static constexpr bool is_array = std::is_array_v<T>;
+
 private:
-    T* ptr;
+    ElementType* ptr;
     int* ref_cnt;
 
     void ReleaseInternal() noexcept {
         if (ref_cnt) {
             --(*ref_cnt);
             if (*ref_cnt == 0) {
-                delete ptr;
+                if constexpr (is_array) {
+                    delete[] ptr;
+                } else {
+                    delete ptr;
+                }
                 delete ref_cnt;
             }
             ptr = nullptr;
@@ -23,7 +32,7 @@ private:
     friend class SharedPtr;
 
 public:
-    explicit SharedPtr(T* p = nullptr)
+    explicit SharedPtr(ElementType* p = nullptr)
         : ptr(p), ref_cnt(p ? new int(1) : nullptr) {}
 
     ~SharedPtr() {
@@ -75,7 +84,7 @@ public:
 
     // Копирующий конструктор от подтипа: SharedPtr<base> b = d;
     template <typename U>
-        requires std::derived_from<U, T>
+        requires (!is_array && std::derived_from<U, ElementType>)
     SharedPtr(const SharedPtr<U>& other) noexcept
         : ptr(other.ptr), ref_cnt(other.ref_cnt) {
         if (ref_cnt) {
@@ -85,7 +94,7 @@ public:
 
     // Копирующий оператор присваивания от подтипа: b = d;
     template <typename U>
-        requires std::derived_from<U, T>
+        requires (!is_array && std::derived_from<U, ElementType>)
     SharedPtr& operator=(const SharedPtr<U>& other) noexcept {
         if (ref_cnt == other.ref_cnt) {
             return *this;
@@ -105,7 +114,7 @@ public:
 
     // Перемещающий конструктор от подтипа: SharedPtr<Base> b = std::move(d);
     template <typename U>
-        requires std::derived_from<U, T>
+        requires (!is_array && std::derived_from<U, ElementType>)
     SharedPtr(SharedPtr<U>&& other) noexcept
         : ptr(other.ptr), ref_cnt(other.ref_cnt) {
         other.ptr = nullptr;
@@ -114,7 +123,7 @@ public:
 
     // Перемещающий оператор присваивания от подтипа: b = std::move(d);
     template <typename U>
-        requires std::derived_from<U, T>
+        requires (!is_array && std::derived_from<U, ElementType>)
     SharedPtr& operator=(SharedPtr<U>&& other) noexcept {
         ReleaseInternal();
 
@@ -126,7 +135,7 @@ public:
         return *this;
     }
 
-    void Reset(T* p = nullptr) {
+    void Reset(ElementType* p = nullptr) {
         if (ptr == p) {
             return;
         }
@@ -137,104 +146,12 @@ public:
         ref_cnt = p ? new int(1) : nullptr;
     }
 
-    T& operator*() const noexcept { return *ptr; }
-    T* operator->() const noexcept { return ptr; }
-    T* Get() const noexcept { return ptr; }
+    ElementType& operator*() const noexcept requires (!is_array) { return *ptr; }
+    ElementType* operator->() const noexcept requires (!is_array) { return ptr; }
 
-    int UseCnt() const noexcept {
-        return ref_cnt ? *ref_cnt : 0;
-    }
+    ElementType& operator[](int index) const noexcept requires (is_array) { return ptr[index]; }
 
-    explicit operator bool() const noexcept {
-        return ptr != nullptr;
-    }
-};
-
-template <typename T>
-class SharedPtr<T[]> {
-private:
-    T* ptr;
-    int* ref_cnt;
-
-    void ReleaseInternal() noexcept {
-        if (ref_cnt) {
-            --(*ref_cnt);
-            if (*ref_cnt == 0) {
-                delete[] ptr;
-                delete ref_cnt;
-            }
-            ptr = nullptr;
-            ref_cnt = nullptr;
-        }
-    }
-
-public:
-    explicit SharedPtr(T* p = nullptr)
-        : ptr(p), ref_cnt(p ? new int(1) : nullptr) {}
-
-    ~SharedPtr() {
-        ReleaseInternal();
-    }
-
-    SharedPtr(const SharedPtr& other) noexcept
-        : ptr(other.ptr), ref_cnt(other.ref_cnt) {
-        if (ref_cnt) {
-            ++(*ref_cnt);
-        }
-    }
-
-    SharedPtr& operator=(const SharedPtr& other) noexcept {
-        if (this == &other || ref_cnt == other.ref_cnt) {
-            return *this;
-        }
-
-        ReleaseInternal();
-
-        ptr = other.ptr;
-        ref_cnt = other.ref_cnt;
-
-        if (ref_cnt) {
-            ++(*ref_cnt);
-        }
-
-        return *this;
-    }
-
-    SharedPtr(SharedPtr&& other) noexcept
-        : ptr(other.ptr), ref_cnt(other.ref_cnt) {
-        other.ptr = nullptr;
-        other.ref_cnt = nullptr;
-    }
-
-    SharedPtr& operator=(SharedPtr&& other) noexcept {
-        if (this != &other) {
-            ReleaseInternal();
-
-            ptr = other.ptr;
-            ref_cnt = other.ref_cnt;
-
-            other.ptr = nullptr;
-            other.ref_cnt = nullptr;
-        }
-        return *this;
-    }
-
-    void Reset(T* p = nullptr) {
-        if (ptr == p) {
-            return;
-        }
-
-        ReleaseInternal();
-
-        ptr = p;
-        ref_cnt = p ? new int(1) : nullptr;
-    }
-
-    T& operator[](int index) const {
-        return ptr[index];
-    }
-
-    T* Get() const noexcept { return ptr; }
+    ElementType* Get() const noexcept { return ptr; }
 
     int UseCnt() const noexcept {
         return ref_cnt ? *ref_cnt : 0;
