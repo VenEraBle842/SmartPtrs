@@ -19,42 +19,36 @@ public:
     UniquePtr(const UniquePtr&) = delete;
     UniquePtr& operator=(const UniquePtr&) = delete;
 
-    UniquePtr(UniquePtr&& other) noexcept : ptr(other.ptr) {
-        other.ptr = nullptr;
-    }
+    UniquePtr(UniquePtr&& other) noexcept : ptr(other.Release()) {}
 
     UniquePtr& operator=(UniquePtr&& other) noexcept {
-        if (this != &other) {
-            delete ptr;
-            ptr = other.ptr;
-            other.ptr = nullptr;
-        }
+        Reset(other.Release());
         return *this;
     }
 
     template <typename U>
         requires std::derived_from<U, T>
-    UniquePtr(UniquePtr<U>&& other) noexcept : ptr(other.release()) {}
+    UniquePtr(UniquePtr<U>&& other) noexcept : ptr(other.Release()) {}
 
     template <typename U>
         requires std::derived_from<U, T>
     UniquePtr& operator=(UniquePtr<U>&& other) noexcept {
-        reset(other.release());
+        Reset(other.Release());
         return *this;
     }
 
     T& operator*() const noexcept { return *ptr; }
     T* operator->() const noexcept { return ptr; }
 
-    T* get() const noexcept { return ptr; }
+    T* Get() const noexcept { return ptr; }
 
-    T* release() noexcept {
+    T* Release() noexcept {
         T* tmp = ptr;
         ptr = nullptr;
         return tmp;
     }
 
-    void reset(T* p = nullptr) noexcept {
+    void Reset(T* p = nullptr) noexcept {
         if (ptr != p) {
             delete ptr;
             ptr = p;
@@ -81,16 +75,10 @@ public:
     UniquePtr(const UniquePtr&) = delete;
     UniquePtr& operator=(const UniquePtr&) = delete;
 
-    UniquePtr(UniquePtr&& other) noexcept : ptr(other.ptr) {
-        other.ptr = nullptr;
-    }
+    UniquePtr(UniquePtr&& other) noexcept : ptr(other.Release()) {}
 
     UniquePtr& operator=(UniquePtr&& other) noexcept {
-        if (this != &other) {
-            delete[] ptr;
-            ptr = other.ptr;
-            other.ptr = nullptr;
-        }
+        Reset(other.Release());
         return *this;
     }
 
@@ -98,15 +86,15 @@ public:
         return ptr[index];
     }
 
-    T* get() const noexcept { return ptr; }
+    T* Get() const noexcept { return ptr; }
 
-    T* release() noexcept {
+    T* Release() noexcept {
         T* tmp = ptr;
         ptr = nullptr;
         return tmp;
     }
 
-    void reset(T* p = nullptr) noexcept {
+    void Reset(T* p = nullptr) noexcept {
         if (ptr != p) {
             delete[] ptr;
             ptr = p;

@@ -26,11 +26,11 @@ int Tracker::alive_count = 0;
 TEST(UniquePtrTest, DefaultAndNullptrConstructor) {
     UniquePtr<int> p1;
     EXPECT_FALSE(p1);
-    EXPECT_EQ(p1.get(), nullptr);
+    EXPECT_EQ(p1.Get(), nullptr);
 
     UniquePtr<int> p2(nullptr);
     EXPECT_FALSE(p2);
-    EXPECT_EQ(p2.get(), nullptr);
+    EXPECT_EQ(p2.Get(), nullptr);
 }
 
 TEST(UniquePtrTest, OwnershipAndDereference) {
@@ -52,7 +52,7 @@ TEST(UniquePtrTest, MoveSemantics) {
         UniquePtr<Tracker> p2(std::move(p1));
 
         EXPECT_FALSE(p1);
-        EXPECT_EQ(p1.get(), nullptr);
+        EXPECT_EQ(p1.Get(), nullptr);
         EXPECT_TRUE(p2);
         EXPECT_EQ(p2->value, 10);
         EXPECT_EQ(Tracker::alive_count, 1);
@@ -80,7 +80,7 @@ TEST(UniquePtrTest, ReleaseAndReset) {
     Tracker::alive_count = 0;
     {
         UniquePtr<Tracker> p(new Tracker(99));
-        Tracker* raw = p.release();
+        Tracker* raw = p.Release();
 
         EXPECT_FALSE(p);
         EXPECT_EQ(Tracker::alive_count, 1); // Объект не должен удалиться
@@ -92,15 +92,15 @@ TEST(UniquePtrTest, ReleaseAndReset) {
 
     {
         UniquePtr<Tracker> p(new Tracker(1));
-        p.reset(new Tracker(2)); // Старый объект удаляется
+        p.Reset(new Tracker(2)); // Старый объект удаляется
         EXPECT_EQ(Tracker::alive_count, 1);
         EXPECT_EQ(p->value, 2);
 
-        p.reset(p.get()); // Сброс на самого себя не должен приводить к UB
+        p.Reset(p.Get()); // Сброс на самого себя не должен приводить к UB
         EXPECT_EQ(Tracker::alive_count, 1);
         EXPECT_EQ(p->value, 2);
 
-        p.reset(nullptr);
+        p.Reset(nullptr);
         EXPECT_EQ(Tracker::alive_count, 0);
         EXPECT_FALSE(p);
     }
@@ -125,29 +125,29 @@ TEST(UniquePtrArrayTest, ArrayOperationsAndDestruction) {
 TEST(SharedPtrTest, DefaultAndNullptrConstructor) {
     SharedPtr<int> sp1;
     EXPECT_FALSE(sp1);
-    EXPECT_EQ(sp1.get(), nullptr);
-    EXPECT_EQ(sp1.use_cnt(), 0);
+    EXPECT_EQ(sp1.Get(), nullptr);
+    EXPECT_EQ(sp1.UseCnt(), 0);
 
     SharedPtr<int> sp2(nullptr);
     EXPECT_FALSE(sp2);
-    EXPECT_EQ(sp2.use_cnt(), 0);
+    EXPECT_EQ(sp2.UseCnt(), 0);
 }
 
 TEST(SharedPtrTest, BasicSharedOwnership) {
     Tracker::alive_count = 0;
     {
         SharedPtr<Tracker> sp1(new Tracker(55));
-        EXPECT_EQ(sp1.use_cnt(), 1);
+        EXPECT_EQ(sp1.UseCnt(), 1);
         EXPECT_EQ(Tracker::alive_count, 1);
         EXPECT_EQ(sp1->value, 55);
 
         {
             SharedPtr<Tracker> sp2 = sp1; // Copy ctor
-            EXPECT_EQ(sp1.use_cnt(), 2);
-            EXPECT_EQ(sp2.use_cnt(), 2);
-            EXPECT_EQ(sp1.get(), sp2.get());
+            EXPECT_EQ(sp1.UseCnt(), 2);
+            EXPECT_EQ(sp2.UseCnt(), 2);
+            EXPECT_EQ(sp1.Get(), sp2.Get());
         }
-        EXPECT_EQ(sp1.use_cnt(), 1);
+        EXPECT_EQ(sp1.UseCnt(), 1);
         EXPECT_EQ(Tracker::alive_count, 1);
     }
     EXPECT_EQ(Tracker::alive_count, 0);
@@ -162,18 +162,18 @@ TEST(SharedPtrTest, CopyAssignmentEdgeCases) {
 
         a = b; // Объект 1 удаляется, a и b разделяют объект 2
         EXPECT_EQ(Tracker::alive_count, 1);
-        EXPECT_EQ(a.use_cnt(), 2);
-        EXPECT_EQ(b.use_cnt(), 2);
+        EXPECT_EQ(a.UseCnt(), 2);
+        EXPECT_EQ(b.UseCnt(), 2);
         EXPECT_EQ(a->value, 2);
 
         // Проверка ветки (this == &other)
         SharedPtr<Tracker>& a_ref = a;
         a = a_ref;
-        EXPECT_EQ(a.use_cnt(), 2);
+        EXPECT_EQ(a.UseCnt(), 2);
 
         // Проверка ветки (ref_cnt == other.ref_cnt)
         a = b;
-        EXPECT_EQ(a.use_cnt(), 2);
+        EXPECT_EQ(a.UseCnt(), 2);
     }
     EXPECT_EQ(Tracker::alive_count, 0);
 }
@@ -185,9 +185,9 @@ TEST(SharedPtrTest, MoveSemantics) {
         SharedPtr<Tracker> sp2(std::move(sp1));
 
         EXPECT_FALSE(sp1);
-        EXPECT_EQ(sp1.use_cnt(), 0);
+        EXPECT_EQ(sp1.UseCnt(), 0);
         EXPECT_TRUE(sp2);
-        EXPECT_EQ(sp2.use_cnt(), 1);
+        EXPECT_EQ(sp2.UseCnt(), 1);
         EXPECT_EQ(sp2->value, 77);
 
         SharedPtr<Tracker> sp3(new Tracker(88));
@@ -203,19 +203,19 @@ TEST(SharedPtrTest, ResetMethod) {
     Tracker::alive_count = 0;
     {
         SharedPtr<Tracker> sp(new Tracker(10));
-        sp.reset(sp.get()); // Проверка if (ptr == p) return;
-        EXPECT_EQ(sp.use_cnt(), 1);
+        sp.Reset(sp.Get()); // Проверка if (ptr == p) return;
+        EXPECT_EQ(sp.UseCnt(), 1);
         EXPECT_EQ(Tracker::alive_count, 1);
 
-        sp.reset(new Tracker(20));
+        sp.Reset(new Tracker(20));
         EXPECT_EQ(Tracker::alive_count, 1);
         EXPECT_EQ(sp->value, 20);
-        EXPECT_EQ(sp.use_cnt(), 1);
+        EXPECT_EQ(sp.UseCnt(), 1);
 
-        sp.reset();
+        sp.Reset();
         EXPECT_EQ(Tracker::alive_count, 0);
         EXPECT_FALSE(sp);
-        EXPECT_EQ(sp.use_cnt(), 0);
+        EXPECT_EQ(sp.UseCnt(), 0);
     }
 }
 
@@ -224,15 +224,15 @@ TEST(SharedPtrArrayTest, ArrayOperations) {
     {
         SharedPtr<Tracker[]> arr1(new Tracker[3]{Tracker(1), Tracker(2), Tracker(3)});
         EXPECT_EQ(Tracker::alive_count, 3);
-        EXPECT_EQ(arr1.use_cnt(), 1);
+        EXPECT_EQ(arr1.UseCnt(), 1);
 
         {
             SharedPtr<Tracker[]> arr2 = arr1;
-            EXPECT_EQ(arr1.use_cnt(), 2);
+            EXPECT_EQ(arr1.UseCnt(), 2);
             EXPECT_EQ(arr2[2].value, 3);
         }
 
-        EXPECT_EQ(arr1.use_cnt(), 1);
+        EXPECT_EQ(arr1.UseCnt(), 1);
         EXPECT_EQ(Tracker::alive_count, 3);
     }
     EXPECT_EQ(Tracker::alive_count, 0); // Проверка вызова delete[] для массива
@@ -268,24 +268,24 @@ static_assert(!std::is_assignable_v<SharedPtr<Circle>&, SharedPtr<Shape>>);
 
 TEST(SubtypingTest, SharedPtrPolymorphism) {
     SharedPtr<Circle> circle(new Circle());
-    EXPECT_EQ(circle.use_cnt(), 1);
+    EXPECT_EQ(circle.UseCnt(), 1);
 
     // Копирование производного в базовый
     SharedPtr<Shape> shape = circle;
-    EXPECT_EQ(shape.use_cnt(), 2);
-    EXPECT_EQ(circle.use_cnt(), 2);
+    EXPECT_EQ(shape.UseCnt(), 2);
+    EXPECT_EQ(circle.UseCnt(), 2);
     EXPECT_EQ(shape->GetName(), "Circle"); // Проверка виртуального полиморфизма
 
     // Присваивание производного базовому
     SharedPtr<Shape> another_shape;
     another_shape = circle;
-    EXPECT_EQ(shape.use_cnt(), 3);
+    EXPECT_EQ(shape.UseCnt(), 3);
 
     // Перемещение производного в базовый
     SharedPtr<Shape> moved_shape = std::move(circle);
     EXPECT_FALSE(circle);
     EXPECT_EQ(moved_shape->GetName(), "Circle");
-    EXPECT_EQ(moved_shape.use_cnt(), 3);
+    EXPECT_EQ(moved_shape.UseCnt(), 3);
 }
 
 TEST(SubtypingTest, UniquePtrPolymorphism) {

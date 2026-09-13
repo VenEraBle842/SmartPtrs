@@ -7,7 +7,7 @@ private:
     T* ptr;
     int* ref_cnt;
 
-    void release_internal() noexcept {
+    void ReleaseInternal() noexcept {
         if (ref_cnt) {
             --(*ref_cnt);
             if (*ref_cnt == 0) {
@@ -27,7 +27,7 @@ public:
         : ptr(p), ref_cnt(p ? new int(1) : nullptr) {}
 
     ~SharedPtr() {
-        release_internal();
+        ReleaseInternal();
     }
 
     SharedPtr(const SharedPtr& other) noexcept
@@ -42,7 +42,7 @@ public:
             return *this;
         }
 
-        release_internal();
+        ReleaseInternal();
 
         ptr = other.ptr;
         ref_cnt = other.ref_cnt;
@@ -62,7 +62,7 @@ public:
 
     SharedPtr& operator=(SharedPtr&& other) noexcept {
         if (this != &other) {
-            release_internal();
+            ReleaseInternal();
 
             ptr = other.ptr;
             ref_cnt = other.ref_cnt;
@@ -91,7 +91,7 @@ public:
             return *this;
         }
 
-        release_internal();
+        ReleaseInternal();
 
         ptr = other.ptr;
         ref_cnt = other.ref_cnt;
@@ -116,7 +116,7 @@ public:
     template <typename U>
         requires std::derived_from<U, T>
     SharedPtr& operator=(SharedPtr<U>&& other) noexcept {
-        release_internal();
+        ReleaseInternal();
 
         ptr = other.ptr;
         ref_cnt = other.ref_cnt;
@@ -126,12 +126,12 @@ public:
         return *this;
     }
 
-    void reset(T* p = nullptr) {
+    void Reset(T* p = nullptr) {
         if (ptr == p) {
             return;
         }
 
-        release_internal();
+        ReleaseInternal();
 
         ptr = p;
         ref_cnt = p ? new int(1) : nullptr;
@@ -139,9 +139,9 @@ public:
 
     T& operator*() const noexcept { return *ptr; }
     T* operator->() const noexcept { return ptr; }
-    T* get() const noexcept { return ptr; }
+    T* Get() const noexcept { return ptr; }
 
-    int use_cnt() const noexcept {
+    int UseCnt() const noexcept {
         return ref_cnt ? *ref_cnt : 0;
     }
 
@@ -156,7 +156,7 @@ private:
     T* ptr;
     int* ref_cnt;
 
-    void release_internal() noexcept {
+    void ReleaseInternal() noexcept {
         if (ref_cnt) {
             --(*ref_cnt);
             if (*ref_cnt == 0) {
@@ -173,7 +173,7 @@ public:
         : ptr(p), ref_cnt(p ? new int(1) : nullptr) {}
 
     ~SharedPtr() {
-        release_internal();
+        ReleaseInternal();
     }
 
     SharedPtr(const SharedPtr& other) noexcept
@@ -188,7 +188,7 @@ public:
             return *this;
         }
 
-        release_internal();
+        ReleaseInternal();
 
         ptr = other.ptr;
         ref_cnt = other.ref_cnt;
@@ -208,7 +208,7 @@ public:
 
     SharedPtr& operator=(SharedPtr&& other) noexcept {
         if (this != &other) {
-            release_internal();
+            ReleaseInternal();
 
             ptr = other.ptr;
             ref_cnt = other.ref_cnt;
@@ -219,12 +219,12 @@ public:
         return *this;
     }
 
-    void reset(T* p = nullptr) {
+    void Reset(T* p = nullptr) {
         if (ptr == p) {
             return;
         }
 
-        release_internal();
+        ReleaseInternal();
 
         ptr = p;
         ref_cnt = p ? new int(1) : nullptr;
@@ -234,9 +234,9 @@ public:
         return ptr[index];
     }
 
-    T* get() const noexcept { return ptr; }
+    T* Get() const noexcept { return ptr; }
 
-    int use_cnt() const noexcept {
+    int UseCnt() const noexcept {
         return ref_cnt ? *ref_cnt : 0;
     }
 
