@@ -44,21 +44,15 @@ void operator delete(void* p, std::size_t) noexcept {
 }
 
 void* operator new[](std::size_t size) {
-    if (MemoryTracker::active) {
-        MemoryTracker::total_allocated_bytes += size;
-        MemoryTracker::allocation_count++;
-    }
-    void* p = std::malloc(size);
-    if (!p) throw std::bad_alloc();
-    return p;
+    return ::operator new(size);
 }
 
 void operator delete[](void* p) noexcept {
-    std::free(p);
+    return ::operator delete(p);
 }
 
-void operator delete[](void* p, std::size_t) noexcept {
-    std::free(p);
+void operator delete[](void* p, std::size_t size) noexcept {
+    return ::operator delete(p, size);
 }
 
 

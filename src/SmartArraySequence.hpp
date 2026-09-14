@@ -174,6 +174,7 @@ public:
         for (int i = index; i < size - 1; ++i) {
             buffer[i] = std::move(buffer[i + 1]);
         }
+        buffer[size - 1] = T();
         --size;
     }
 

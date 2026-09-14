@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "SharedPtr.hpp"
-#include "UniquePtr.hpp"
+#include "SmartArraySequence.hpp"
 
 // Вспомогательный класс для проверки вызова конструкторов/деструкторов
 struct Tracker {
@@ -13,6 +13,11 @@ struct Tracker {
 
     Tracker(const Tracker& other) : value(other.value) {
         ++alive_count;
+    }
+
+    Tracker& operator=(const Tracker& other) {
+        value = other.value;
+        return *this;
     }
 
     ~Tracker() {
@@ -302,4 +307,77 @@ TEST(SubtypingTest, UniquePtrPolymorphism) {
     shape = std::move(circle2);
     EXPECT_FALSE(circle2);
     EXPECT_EQ(shape->GetName(), "Circle");
+}
+
+
+TEST(SmartArraySequenceTest, BasicOperations) {
+    SmartArraySequence<int> seq;
+    EXPECT_TRUE(seq.IsEmpty());
+    EXPECT_EQ(seq.GetLength(), 0);
+
+    seq.Append(10);
+    seq.Append(20);
+    seq.Prepend(5); // [5, 10, 20]
+
+    EXPECT_EQ(seq.GetLength(), 3);
+    EXPECT_EQ(seq[0], 5);
+    EXPECT_EQ(seq[1], 10);
+    EXPECT_EQ(seq[2], 20);
+
+    seq.InsertAt(15, 2); // [5, 10, 15, 20]
+    EXPECT_EQ(seq.GetLength(), 4);
+    EXPECT_EQ(seq[2], 15);
+
+    seq.RemoveAt(1); // Удаляем 10 -> [5, 15, 20]
+    EXPECT_EQ(seq.GetLength(), 3);
+    EXPECT_EQ(seq[0], 5);
+    EXPECT_EQ(seq[1], 15);
+    EXPECT_EQ(seq[2], 20);
+}
+
+TEST(SmartArraySequenceTest, MemoryManagementWithTracker) {
+    Tracker::alive_count = 0;
+    {
+        SmartArraySequence<Tracker> seq(3);
+        seq.Append(Tracker(1));
+        seq.Append(Tracker(2));
+        seq.Append(Tracker(3));
+        EXPECT_EQ(Tracker::alive_count, 3);
+    }
+    // При выходе из блока весь буфер UniquePtr<Tracker[]> должен очиститься
+    EXPECT_EQ(Tracker::alive_count, 0);
+}
+
+
+struct Animal {
+    virtual ~Animal() = default;
+    virtual std::string Speak() const = 0;
+};
+
+struct Dog : public Animal {
+    std::string Speak() const override { return "Woof"; }
+};
+
+struct Cat : public Animal {
+    std::string Speak() const override { return "Meow"; }
+};
+
+TEST(SmartArraySequenceTest, PolymorphicSmartPointersInContainer) {
+    // Контейнер хранит SharedPtr на базовый класс Animal
+    SmartArraySequence<SharedPtr<Animal>> zoo;
+
+    SharedPtr<Dog> dog(new Dog());
+    SharedPtr<Cat> cat(new Cat());
+
+    // Благодаря подтипизации SharedPtr<Dog> неявно преобразуется в SharedPtr<Animal>
+    zoo.Append(dog);
+    zoo.Append(cat);
+
+    EXPECT_EQ(zoo.GetLength(), 2);
+    EXPECT_EQ(zoo[0]->Speak(), "Woof");
+    EXPECT_EQ(zoo[1]->Speak(), "Meow");
+
+    // Проверяем счетчики ссылок (zoo и локальные dog/cat разделяют владение)
+    EXPECT_EQ(dog.UseCnt(), 2);
+    EXPECT_EQ(cat.UseCnt(), 2);
 }

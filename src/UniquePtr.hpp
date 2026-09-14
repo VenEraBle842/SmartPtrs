@@ -57,9 +57,11 @@ public:
     template <typename U>
         requires (!is_array && std::derived_from<U, ElementType>)
     UniquePtr& operator=(UniquePtr<U>&& other) noexcept {
-        DestroyInternal();
-        ptr = other.ptr;
-        other.ptr = nullptr;
+        if (ptr != other.ptr) {
+            DestroyInternal();
+            ptr = other.ptr;
+            other.ptr = nullptr;
+        }
         return *this;
     }
 
