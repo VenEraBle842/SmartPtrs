@@ -161,7 +161,7 @@ TEST(BenchmarkTest, SmallAllocations) {
                 recorded_heap = MemoryTracker::total_allocated_bytes;
             }
         }
-        results.Append(BenchmarkResult{"Custom UniquePtr", sizeof(UniquePtr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"UniquePtr", sizeof(UniquePtr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
     }
 
     // 3. std::unique_ptr
@@ -219,7 +219,7 @@ TEST(BenchmarkTest, SmallAllocations) {
                 recorded_heap = MemoryTracker::total_allocated_bytes;
             }
         }
-        results.Append(BenchmarkResult{"Custom SharedPtr", sizeof(SharedPtr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"SharedPtr", sizeof(SharedPtr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
     }
 
     // 5. std::shared_ptr
@@ -248,7 +248,7 @@ TEST(BenchmarkTest, SmallAllocations) {
                 recorded_heap = MemoryTracker::total_allocated_bytes;
             }
         }
-        results.Append(BenchmarkResult{"std::shared_ptr (new)", sizeof(std::shared_ptr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"std::shared_ptr", sizeof(std::shared_ptr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
     }
 
     // 6. std::make_shared
@@ -327,7 +327,7 @@ TEST(BenchmarkTest, LargeAllocations) {
         MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"Custom UniquePtr", sizeof(UniquePtr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"UniquePtr", sizeof(UniquePtr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
     }
 
     // 3. std::unique_ptr
@@ -367,7 +367,7 @@ TEST(BenchmarkTest, LargeAllocations) {
         MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"Custom SharedPtr", sizeof(SharedPtr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"SharedPtr", sizeof(SharedPtr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
     }
 
     // 5. std::shared_ptr
@@ -387,7 +387,7 @@ TEST(BenchmarkTest, LargeAllocations) {
         MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"std::shared_ptr (new)", sizeof(std::shared_ptr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"std::shared_ptr", sizeof(std::shared_ptr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
     }
 
     // 6. std::make_shared
@@ -452,8 +452,8 @@ TEST(BenchmarkTest, CopyingOverhead) {
         auto t1 = std::chrono::high_resolution_clock::now();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        std::cout << std::left << std::setw(25) << "Custom SharedPtr Copy:"
-                  << std::right << std::setw(10) << std::fixed << std::setprecision(1) << us << " us  [Non-atomic]\n";
+        std::cout << std::left << std::setw(25) << "SharedPtr Copy:"
+                  << std::right << std::setw(10) << std::fixed << std::setprecision(1) << us << " us\n";
     }
 
     // 3. std::shared_ptr copy
@@ -471,7 +471,7 @@ TEST(BenchmarkTest, CopyingOverhead) {
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
         std::cout << std::left << std::setw(25) << "std::shared_ptr Copy:"
-                  << std::right << std::setw(10) << std::fixed << std::setprecision(1) << us << " us  [Atomic (std)]\n";
+                  << std::right << std::setw(10) << std::fixed << std::setprecision(1) << us << " us (std)\n";
     }
     std::cout << "======================================================================================================\n\n";
 }
