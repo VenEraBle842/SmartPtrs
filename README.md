@@ -79,21 +79,27 @@ cmake --build build
 *(На Windows: `.\build\Release\smart_ptrs_demo.exe` или `.\build\smart_ptrs_demo.exe`)*
 
 ### 5. Запуск тестов
-- Запустить **все тесты** разом с выводом таблиц в консоль:
+#### Прямой запуск бинарников:
+- **Функциональные тесты**
   ```bash
-  ./build/smart_ptrs_tests
+  ./build/functional_tests
   ```
-- Запустить **только функциональные тесты**:
+- **Бенчмарки**
   ```bash
-  ./build/smart_ptrs_tests --gtest_filter="*Test.*"
+  ./build/benchmark_tests
   ```
-- Запустить **только бенчмарки**:
-  ```bash
-  ./build/smart_ptrs_tests --gtest_filter="BenchmarkTest.*"
-  ```
-- Или через стандартный runner `ctest`:
+#### Через CTest:
+- **Все тесты подряд**
   ```bash
   ctest --test-dir build --output-on-failure
+  ```
+- **Только функциональные тесты**
+  ```bash
+  ctest --test-dir build -R functional_tests --output-on-failure
+  ```
+- **Только бенчмарки**
+  ```bash
+  ctest --test-dir build -R benchmark_tests --output-on-failure
   ```
 
 #### Функциональные тесты (`tests/FunctionalTests.cpp`)
