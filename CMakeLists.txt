@@ -32,15 +32,24 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable(smart_ptrs_tests
+add_executable(functional_tests
     tests/FunctionalTests.cpp
-    tests/BenchmarkTests.cpp
 )
-target_link_libraries(smart_ptrs_tests PRIVATE
+target_link_libraries(functional_tests PRIVATE
     SmartPtrs
     GTest::gtest_main
 )
-target_compile_options(smart_ptrs_tests PRIVATE -Wall -Wextra)
+target_compile_options(functional_tests PRIVATE -Wall -Wextra)
+
+add_executable(benchmark_tests
+    tests/BenchmarkTests.cpp
+)
+target_link_libraries(benchmark_tests PRIVATE
+    SmartPtrs
+    GTest::gtest_main
+)
+target_compile_options(benchmark_tests PRIVATE -Wall -Wextra)
 
 include(GoogleTest)
-gtest_discover_tests(smart_ptrs_tests)
+gtest_discover_tests(functional_tests)
+gtest_discover_tests(benchmark_tests)

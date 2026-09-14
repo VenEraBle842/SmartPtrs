@@ -123,16 +123,20 @@ cmake --build build
 
 ### Проверка на утечки памяти (Sanitizers / Valgrind)
 
+Для проверки корректности работы с памятью и отсутствия утечек используются функциональные тесты (`functional_tests`), изолированные от глобальной перегрузки операторов аллокации из бенчмарков.
+
 Сборка с AddressSanitizer и UndefinedBehaviorSanitizer (GCC / Clang):
 ```bash
 cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
 cmake --build build-asan
-./build-asan/smart_ptrs_tests
+./build-asan/functional_tests
 ```
 
-Запуск под Valgrind (Linux):
+Сборка и запуск под Valgrind (Linux):
 ```bash
-valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build/smart_ptrs_tests
+cmake -B build-debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-debug
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build-debug/functional_tests
 ```
 
 ---
