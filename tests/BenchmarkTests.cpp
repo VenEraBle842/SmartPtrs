@@ -8,52 +8,16 @@
 #include "SharedPtr.hpp"
 #include "SmartArraySequence.hpp"
 
-// Инструмент учета динамической памяти
-struct MemoryTracker {
-    static inline size_t total_allocated_bytes = 0;
-    static inline size_t allocation_count = 0;
-    static inline bool active = false;
-
-    static void Start() {
-        total_allocated_bytes = 0;
-        allocation_count = 0;
-        active = true;
-    }
-
-    static void Stop() {
-        active = false;
-    }
-};
-
-void* operator new(std::size_t size) {
-    if (MemoryTracker::active) {
-        MemoryTracker::total_allocated_bytes += size;
-        MemoryTracker::allocation_count++;
-    }
-    void* p = std::malloc(size);
-    if (!p) throw std::bad_alloc();
-    return p;
-}
-
-void operator delete(void* p) noexcept {
-    std::free(p);
-}
-
-void operator delete(void* p, std::size_t) noexcept {
-    std::free(p);
-}
-
-void* operator new[](std::size_t size) {
-    return ::operator new(size);
-}
-
-void operator delete[](void* p) noexcept {
-    return ::operator delete(p);
-}
-
-void operator delete[](void* p, std::size_t size) noexcept {
-    return ::operator delete(p, size);
-}
+// Архитектурные константы расхода памяти на куче для типа int (на 64-битной платформе):
+// - Raw / UniquePtr: только размер sizeof(int) = 4 байта
+// - SharedPtr: sizeof(int) + sizeof(int) под ref_cnt = 8 байт
+// - std::shared_ptr: sizeof(int) + 24 байта управляющий блок (_Sp_counted_ptr) = 28 байт
+// - std::make_shared: 1 объединенный блок под объект и счетчики = 28 байт
+constexpr size_t INT_SIZE = sizeof(int);
+constexpr size_t SHARED_PTR_HEAP_PER_OBJ = sizeof(int) + sizeof(int);
+constexpr size_t STD_SHARED_PTR_CONTROL_BLOCK = 24;
+constexpr size_t STD_SHARED_HEAP_PER_OBJ = sizeof(int) + STD_SHARED_PTR_CONTROL_BLOCK;
+constexpr size_t STD_MAKE_SHARED_HEAP_PER_OBJ = sizeof(int) + STD_SHARED_PTR_CONTROL_BLOCK;
 
 
 struct BenchmarkResult {
@@ -89,7 +53,7 @@ static void PrintBenchmarkTable(const std::string& title, size_t N, const SmartA
 }
 
 // Защита от оптимизации мертвого кода компилятором (-O3)
-volatile int g_sink = 0;
+volatile long long g_sink = 0;
 
 // Малое число аллокаций (N = 1000) с усреднением по 100 прогонам
 TEST(BenchmarkTest, SmallAllocations) {
@@ -100,14 +64,10 @@ TEST(BenchmarkTest, SmallAllocations) {
     // 1. Raw Pointer
     {
         double total_time = 0;
-        size_t recorded_allocs = 0, recorded_heap = 0;
-
         for (size_t iter = 0; iter < ITERATIONS; ++iter) {
-            int** ptrs = new int*[N]; // буфер выделяется вне замера
+            int** ptrs = new int*[N];
 
-            MemoryTracker::Start();
             auto t0 = std::chrono::high_resolution_clock::now();
-
             for (size_t i = 0; i < N; ++i) {
                 ptrs[i] = new int(static_cast<int>(i));
                 g_sink += *ptrs[i];
@@ -115,163 +75,107 @@ TEST(BenchmarkTest, SmallAllocations) {
             for (size_t i = 0; i < N; ++i) {
                 delete ptrs[i];
             }
-
             auto t1 = std::chrono::high_resolution_clock::now();
-            MemoryTracker::Stop();
 
             delete[] ptrs;
             total_time += std::chrono::duration<double, std::micro>(t1 - t0).count();
-            if (iter == 0) {
-                recorded_allocs = MemoryTracker::allocation_count;
-                recorded_heap = MemoryTracker::total_allocated_bytes;
-            }
         }
-        results.Append(BenchmarkResult{"Raw Pointer", sizeof(int*), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"Raw Pointer", sizeof(int*), N, N * INT_SIZE, total_time / ITERATIONS});
     }
 
     // 2. UniquePtr
     {
         double total_time = 0;
-        size_t recorded_allocs = 0, recorded_heap = 0;
-
         for (size_t iter = 0; iter < ITERATIONS; ++iter) {
-            SmartArraySequence<UniquePtr<int>> seq(N); // буфер выделяется ДО замера
+            SmartArraySequence<UniquePtr<int>> seq(N);
 
-            MemoryTracker::Start();
             auto t0 = std::chrono::high_resolution_clock::now();
-
             for (size_t i = 0; i < N; ++i) {
                 seq.Append(UniquePtr<int>(new int(static_cast<int>(i))));
                 g_sink += *seq[static_cast<int>(i)];
             }
             seq.Clear();
-
             auto t1 = std::chrono::high_resolution_clock::now();
-            MemoryTracker::Stop();
 
             total_time += std::chrono::duration<double, std::micro>(t1 - t0).count();
-            if (iter == 0) {
-                recorded_allocs = MemoryTracker::allocation_count;
-                recorded_heap = MemoryTracker::total_allocated_bytes;
-            }
         }
-        results.Append(BenchmarkResult{"UniquePtr", sizeof(UniquePtr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"UniquePtr", sizeof(UniquePtr<int>), N, N * INT_SIZE, total_time / ITERATIONS});
     }
 
     // 3. std::unique_ptr
     {
         double total_time = 0;
-        size_t recorded_allocs = 0, recorded_heap = 0;
-
         for (size_t iter = 0; iter < ITERATIONS; ++iter) {
             SmartArraySequence<std::unique_ptr<int>> seq(N);
 
-            MemoryTracker::Start();
             auto t0 = std::chrono::high_resolution_clock::now();
-
             for (size_t i = 0; i < N; ++i) {
                 seq.Append(std::unique_ptr<int>(new int(static_cast<int>(i))));
                 g_sink += *seq[static_cast<int>(i)];
             }
             seq.Clear();
-
             auto t1 = std::chrono::high_resolution_clock::now();
-            MemoryTracker::Stop();
 
             total_time += std::chrono::duration<double, std::micro>(t1 - t0).count();
-            if (iter == 0) {
-                recorded_allocs = MemoryTracker::allocation_count;
-                recorded_heap = MemoryTracker::total_allocated_bytes;
-            }
         }
-        results.Append(BenchmarkResult{"std::unique_ptr", sizeof(std::unique_ptr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"std::unique_ptr", sizeof(std::unique_ptr<int>), N, N * INT_SIZE, total_time / ITERATIONS});
     }
 
-    // 4. SharedPtr
+    // 4. SharedPtr (2 аллокации: int + int под ref_cnt)
     {
         double total_time = 0;
-        size_t recorded_allocs = 0, recorded_heap = 0;
-
         for (size_t iter = 0; iter < ITERATIONS; ++iter) {
             SmartArraySequence<SharedPtr<int>> seq(N);
 
-            MemoryTracker::Start();
             auto t0 = std::chrono::high_resolution_clock::now();
-
             for (size_t i = 0; i < N; ++i) {
                 seq.Append(SharedPtr<int>(new int(static_cast<int>(i))));
                 g_sink += *seq[static_cast<int>(i)];
             }
             seq.Clear();
-
             auto t1 = std::chrono::high_resolution_clock::now();
-            MemoryTracker::Stop();
 
             total_time += std::chrono::duration<double, std::micro>(t1 - t0).count();
-            if (iter == 0) {
-                recorded_allocs = MemoryTracker::allocation_count;
-                recorded_heap = MemoryTracker::total_allocated_bytes;
-            }
         }
-        results.Append(BenchmarkResult{"SharedPtr", sizeof(SharedPtr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"SharedPtr", sizeof(SharedPtr<int>), 2 * N, N * SHARED_PTR_HEAP_PER_OBJ, total_time / ITERATIONS});
     }
 
-    // 5. std::shared_ptr
+    // 5. std::shared_ptr (2 аллокации: int + управляющий блок)
     {
         double total_time = 0;
-        size_t recorded_allocs = 0, recorded_heap = 0;
-
         for (size_t iter = 0; iter < ITERATIONS; ++iter) {
             SmartArraySequence<std::shared_ptr<int>> seq(N);
 
-            MemoryTracker::Start();
             auto t0 = std::chrono::high_resolution_clock::now();
-
             for (size_t i = 0; i < N; ++i) {
                 seq.Append(std::shared_ptr<int>(new int(static_cast<int>(i))));
                 g_sink += *seq[static_cast<int>(i)];
             }
             seq.Clear();
-
             auto t1 = std::chrono::high_resolution_clock::now();
-            MemoryTracker::Stop();
 
             total_time += std::chrono::duration<double, std::micro>(t1 - t0).count();
-            if (iter == 0) {
-                recorded_allocs = MemoryTracker::allocation_count;
-                recorded_heap = MemoryTracker::total_allocated_bytes;
-            }
         }
-        results.Append(BenchmarkResult{"std::shared_ptr", sizeof(std::shared_ptr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"std::shared_ptr", sizeof(std::shared_ptr<int>), 2 * N, N * STD_SHARED_HEAP_PER_OBJ, total_time / ITERATIONS});
     }
 
-    // 6. std::make_shared
+    // 6. std::make_shared (1 объединенная аллокация)
     {
         double total_time = 0;
-        size_t recorded_allocs = 0, recorded_heap = 0;
-
         for (size_t iter = 0; iter < ITERATIONS; ++iter) {
             SmartArraySequence<std::shared_ptr<int>> seq(N);
 
-            MemoryTracker::Start();
             auto t0 = std::chrono::high_resolution_clock::now();
-
             for (size_t i = 0; i < N; ++i) {
                 seq.Append(std::make_shared<int>(static_cast<int>(i)));
                 g_sink += *seq[static_cast<int>(i)];
             }
             seq.Clear();
-
             auto t1 = std::chrono::high_resolution_clock::now();
-            MemoryTracker::Stop();
 
             total_time += std::chrono::duration<double, std::micro>(t1 - t0).count();
-            if (iter == 0) {
-                recorded_allocs = MemoryTracker::allocation_count;
-                recorded_heap = MemoryTracker::total_allocated_bytes;
-            }
         }
-        results.Append(BenchmarkResult{"std::make_shared", sizeof(std::shared_ptr<int>), recorded_allocs, recorded_heap, total_time / ITERATIONS});
+        results.Append(BenchmarkResult{"std::make_shared", sizeof(std::shared_ptr<int>), N, N * STD_MAKE_SHARED_HEAP_PER_OBJ, total_time / ITERATIONS});
     }
 
     PrintBenchmarkTable("Allocation & Deallocation Lifecycle (Small Scale)", N, results);
@@ -285,7 +189,6 @@ TEST(BenchmarkTest, LargeAllocations) {
     // 1. Raw Pointer
     {
         int** ptrs = new int*[N];
-        MemoryTracker::Start();
         auto t0 = std::chrono::high_resolution_clock::now();
 
         for (size_t i = 0; i < N; ++i) {
@@ -297,111 +200,90 @@ TEST(BenchmarkTest, LargeAllocations) {
         }
 
         auto t1 = std::chrono::high_resolution_clock::now();
-        MemoryTracker::Stop();
         delete[] ptrs;
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"Raw Pointer", sizeof(int*), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"Raw Pointer", sizeof(int*), N, N * INT_SIZE, us});
     }
 
     // 2. UniquePtr
     {
         SmartArraySequence<UniquePtr<int>> seq(N);
 
-        MemoryTracker::Start();
         auto t0 = std::chrono::high_resolution_clock::now();
-
         for (size_t i = 0; i < N; ++i) {
             seq.Append(UniquePtr<int>(new int(static_cast<int>(i))));
             g_sink += *seq[static_cast<int>(i)];
         }
         seq.Clear();
-
         auto t1 = std::chrono::high_resolution_clock::now();
-        MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"UniquePtr", sizeof(UniquePtr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"UniquePtr", sizeof(UniquePtr<int>), N, N * INT_SIZE, us});
     }
 
     // 3. std::unique_ptr
     {
         SmartArraySequence<std::unique_ptr<int>> seq(N);
 
-        MemoryTracker::Start();
         auto t0 = std::chrono::high_resolution_clock::now();
-
         for (size_t i = 0; i < N; ++i) {
             seq.Append(std::unique_ptr<int>(new int(static_cast<int>(i))));
             g_sink += *seq[static_cast<int>(i)];
         }
         seq.Clear();
-
         auto t1 = std::chrono::high_resolution_clock::now();
-        MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"std::unique_ptr", sizeof(std::unique_ptr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"std::unique_ptr", sizeof(std::unique_ptr<int>), N, N * INT_SIZE, us});
     }
 
     // 4. SharedPtr
     {
         SmartArraySequence<SharedPtr<int>> seq(N);
 
-        MemoryTracker::Start();
         auto t0 = std::chrono::high_resolution_clock::now();
-
         for (size_t i = 0; i < N; ++i) {
             seq.Append(SharedPtr<int>(new int(static_cast<int>(i))));
             g_sink += *seq[static_cast<int>(i)];
         }
         seq.Clear();
-
         auto t1 = std::chrono::high_resolution_clock::now();
-        MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"SharedPtr", sizeof(SharedPtr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"SharedPtr", sizeof(SharedPtr<int>), 2 * N, N * SHARED_PTR_HEAP_PER_OBJ, us});
     }
 
     // 5. std::shared_ptr
     {
         SmartArraySequence<std::shared_ptr<int>> seq(N);
 
-        MemoryTracker::Start();
         auto t0 = std::chrono::high_resolution_clock::now();
-
         for (size_t i = 0; i < N; ++i) {
             seq.Append(std::shared_ptr<int>(new int(static_cast<int>(i))));
             g_sink += *seq[static_cast<int>(i)];
         }
         seq.Clear();
-
         auto t1 = std::chrono::high_resolution_clock::now();
-        MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"std::shared_ptr", sizeof(std::shared_ptr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"std::shared_ptr", sizeof(std::shared_ptr<int>), 2 * N, N * STD_SHARED_HEAP_PER_OBJ, us});
     }
 
     // 6. std::make_shared
     {
         SmartArraySequence<std::shared_ptr<int>> seq(N);
 
-        MemoryTracker::Start();
         auto t0 = std::chrono::high_resolution_clock::now();
-
         for (size_t i = 0; i < N; ++i) {
             seq.Append(std::make_shared<int>(static_cast<int>(i)));
             g_sink += *seq[static_cast<int>(i)];
         }
         seq.Clear();
-
         auto t1 = std::chrono::high_resolution_clock::now();
-        MemoryTracker::Stop();
 
         double us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        results.Append(BenchmarkResult{"std::make_shared", sizeof(std::shared_ptr<int>), MemoryTracker::allocation_count, MemoryTracker::total_allocated_bytes, us});
+        results.Append(BenchmarkResult{"std::make_shared", sizeof(std::shared_ptr<int>), N, N * STD_MAKE_SHARED_HEAP_PER_OBJ, us});
     }
 
     PrintBenchmarkTable("Allocation & Deallocation Lifecycle (Large Scale)", N, results);

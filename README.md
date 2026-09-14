@@ -136,6 +136,7 @@ cmake --build build
 cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
 cmake --build build-asan
 ./build-asan/functional_tests
+./build-asan/benchmark_tests
 ```
 
 Сборка и запуск под Valgrind (Linux):
@@ -143,6 +144,7 @@ cmake --build build-asan
 cmake -B build-debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build-debug
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build-debug/functional_tests
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./build-debug/benchmark_tests
 ```
 
 ---
